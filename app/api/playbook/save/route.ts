@@ -97,7 +97,9 @@ export async function POST(req: Request) {
           content,
           version: existing.version + 1,
           updated_at: new Date().toISOString(),
-          updated_by: userId || null
+          updated_by: userId || null,
+          methodology: null,
+          methodology_status: null,
         })
         .eq('id', existing.id)
         .select()

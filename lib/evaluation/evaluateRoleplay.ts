@@ -604,10 +604,10 @@ Dados da empresa para validar informações do vendedor:
 
 ⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou na transcrição (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve zerar o indicador N4 (Credibilidade e Confiança) e ser mencionado em critical_gaps.`
 
-// Seção do prompt para análise de playbook
-const PLAYBOOK_SECTION = `
+// PLAYBOOK_SECTION removido — metodologia pré-extraída é obrigatória agora
+const _PLAYBOOK_SECTION_REMOVED = `
 
-=== CARD: PLAYBOOK ADHERENCE ===
+=== CARD: PLAYBOOK ADHERENCE (LEGACY - NÃO USADO) ===
 
 CONTEXTO DA EMPRESA:
 - Nome da empresa: {company_name}
@@ -776,6 +776,7 @@ export async function evaluateRoleplay(params: EvaluationParams): Promise<Rolepl
   // 1. Buscar dados da empresa para validação
   let companyContext = 'Dados da empresa não disponíveis'
   let playbookContent: string | null = null
+  let playbookMethodology: any = null
 
   // Variáveis para contexto do playbook
   let companyName = 'Não informado'
@@ -825,10 +826,10 @@ Erros Comuns: ${companyData.erros_comuns || 'Não informado'}
 Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
     }
 
-    // Buscar playbook da empresa
+    // Buscar playbook da empresa (inclui metodologia pré-extraída se disponível)
     const { data: playbook } = await supabaseAdmin
       .from('sales_playbooks')
-      .select('content')
+      .select('content, methodology, methodology_status')
       .eq('company_id', companyId)
       .eq('is_active', true)
       .single()
@@ -836,6 +837,10 @@ Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
     if (playbook?.content) {
       playbookContent = playbook.content
       console.log('📖 Playbook encontrado, incluindo na avaliação do roleplay')
+      if (playbook.methodology_status === 'ready' && playbook.methodology) {
+        playbookMethodology = playbook.methodology
+        console.log('📋 Metodologia pré-extraída disponível, usando critérios fixos')
+      }
     }
   }
 
@@ -846,13 +851,139 @@ Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
     .replace('{objetivo}', objetivo)
     .replace('{company_data}', companyContext)
 
-  // 3. Se houver playbook, adicionar seção de análise ao prompt
-  if (playbookContent) {
-    userPrompt += PLAYBOOK_SECTION
-      .replace('{company_name}', companyName)
-      .replace('{company_description}', companyDescription)
-      .replace('{company_type}', companyType)
-      .replace('{playbook_content}', playbookContent)
+  // 3. Se houver metodologia, adicionar avaliação de aderência ao playbook
+  if (playbookMethodology?.dimensions) {
+    const methodologyJson = JSON.stringify(playbookMethodology.dimensions, null, 2)
+    userPrompt += `
+
+=== CARD: PLAYBOOK ADHERENCE ===
+
+CONTEXTO COMPLETO DA EMPRESA:
+- Nome: ${companyName}
+- Descrição: ${companyDescription}
+- Tipo: ${companyType}
+${companyContext !== 'Dados da empresa não disponíveis' ? `\nDADOS DA EMPRESA:\n${companyContext}` : ''}
+${playbookMethodology.sales_philosophy ? `\nFILOSOFIA DE VENDAS DA EMPRESA:\n${playbookMethodology.sales_philosophy}` : ''}
+${playbookMethodology.target_audience ? `\nPÚBLICO-ALVO:\n${playbookMethodology.target_audience}` : ''}
+
+A empresa possui uma METODOLOGIA DE VENDAS PERSONALIZADA extraída dos seus materiais (playbook, documentos, manuais). Você DEVE usar esta metodologia para avaliar a aderência do vendedor.
+
+=== METODOLOGIA DA EMPRESA (CRITÉRIOS OBRIGATÓRIOS) ===
+${methodologyJson}
+=== FIM DA METODOLOGIA ===
+${playbookContent ? `
+MATERIAIS COMPLETOS DA EMPRESA (playbook + documentos — use para buscar evidências e trechos específicos):
+--- INÍCIO DOS MATERIAIS ---
+${playbookContent}
+--- FIM DOS MATERIAIS ---
+` : ''}
+COMO AVALIAR CADA CRITÉRIO:
+
+Cada critério da metodologia contém:
+- "criterion": O que avaliar (título)
+- "detailed_description": O que EXATAMENTE é esperado do vendedor, com exemplos específicos da empresa
+- "evaluation_guidance": COMO VERIFICAR na transcrição se o vendedor cumpriu este critério
+- "type": required (obrigatório) | recommended (recomendado) | prohibited (proibido)
+- "weight": critical | high | medium | low
+
+⚠️ CONTEXTO IMPORTANTE — ISTO É UMA SIMULAÇÃO:
+Este é um ROLEPLAY de treinamento, não uma venda real. O "cliente" é uma IA que pode ter limitações:
+- A IA pode ter encerrado a conversa prematuramente
+- A IA pode não ter dado abertura para o vendedor executar certos critérios
+- A IA pode ter mudado de assunto abruptamente ou não reagido como um cliente real faria
+- A simulação pode ter sido curta demais para cobrir todos os critérios
+NÃO PENALIZE o vendedor por limitações da simulação. Avalie apenas o que o vendedor CONTROLAVA.
+
+PROCESSO DE AVALIAÇÃO:
+
+1. Para CADA critério, leia o "evaluation_guidance" e busque na transcrição evidências.
+2. ANTES de classificar, pergunte-se: "O vendedor teve oportunidade real de executar este critério?"
+3. Classifique cada critério:
+
+result         | Quando usar                                                                | points_earned
+compliant      | Vendedor executou corretamente conforme descrito na metodologia             | 100
+partial        | Vendedor TENTOU executar mas a execução teve falhas — valorize o esforço    | 50
+missed         | Vendedor tinha oportunidade CLARA e INEQUÍVOCA mas ignorou ou esqueceu      | 0
+violated       | Vendedor fez EXATAMENTE O OPOSTO do esperado (APENAS para "prohibited")     | -50
+not_applicable | Vendedor NÃO TEVE oportunidade de executar (ver regras abaixo)              | N/A (exclui)
+
+4. Para cada critério avaliado, inclua:
+   - O trecho EXATO da transcrição como evidência
+   - Se "missed": explique qual foi o momento onde o vendedor DEVERIA ter agido
+   - Se "not_applicable": explique brevemente por que não se aplicou
+   - Notas específicas quando relevante
+
+REGRAS DE JUSTIÇA — "missed" vs "not_applicable":
+
+Use "not_applicable" (NÃO penalize) quando:
+- A conversa não chegou a esse ponto (roleplay curto, IA encerrou antes)
+- O cliente IA não deu abertura para o vendedor executar (ex: critério de fechamento mas o cliente cortou a conversa)
+- O critério exige uma situação que não ocorreu (ex: "responder objeção de preço" mas o cliente não objetou preço)
+- A simulação teve problemas técnicos ou a IA se comportou de forma inconsistente
+- O vendedor tentou direcionar para executar o critério mas o contexto não permitiu
+
+Use "missed" (penalize) APENAS quando:
+- O vendedor teve oportunidade CLARA E INEQUÍVOCA de executar
+- Houve um momento específico na transcrição onde era óbvio que o vendedor deveria ter agido
+- O vendedor demonstrou desconhecimento ou esquecimento do critério
+
+Use "partial" (valorize o esforço) quando:
+- O vendedor tentou executar mas fez de forma incompleta ou com erros menores
+- O vendedor demonstrou conhecimento do critério mas a execução não foi perfeita
+- O vendedor abordou o tema mas não com a profundidade esperada pela metodologia
+- O vendedor adaptou o critério ao contexto de forma razoável mas diferente do ideal
+
+REGRA DE OURO: Na dúvida entre "missed" e "not_applicable", SEMPRE escolha "not_applicable". Na dúvida entre "missed" e "partial", SEMPRE escolha "partial". O objetivo é desenvolver o vendedor, não puni-lo por circunstâncias fora do seu controle.
+
+CÁLCULO DE SCORES:
+
+Score por dimensão:
+score = (Σ points_earned × weight_multiplier) / (Σ max_points × weight_multiplier) × 100
+weight_multiplier: critical=3, high=2, medium=1, low=0.5
+Critérios "not_applicable" são EXCLUÍDOS do cálculo (não contam no denominador).
+
+Score geral (pesos das dimensões — apenas dimensões avaliadas):
+- opening: 20%, closing: 25%, conduct: 20%, required_scripts: 20%, process: 15%
+Se uma dimensão for "not_evaluated" (status "not_found" na metodologia), redistribua o peso proporcionalmente.
+Se TODOS os critérios de uma dimensão forem "not_applicable", marque a dimensão como "not_evaluated".
+
+adherence_level:
+- exemplary: 90-100% (vendedor seguiu a metodologia com excelência)
+- compliant: 70-89% (vendedor seguiu a maioria dos critérios)
+- partial: 50-69% (aderência parcial, gaps significativos)
+- non_compliant: 0-49% (não seguiu a metodologia da empresa)
+
+REGRAS ESPECIAIS:
+1. Dimensões com status "not_found" na metodologia → "not_evaluated", excluir do cálculo
+2. "violations" = APENAS regras PROIBIDAS que o vendedor ATIVAMENTE VIOLOU (fez o oposto). Array VAZIO [] se não houve violações. NÃO confunda "não fez" com "violou" — violar é fazer o contrário.
+3. "missed_requirements" = critérios obrigatórios que o vendedor IGNOROU apesar de ter oportunidade CLARA. NÃO inclua critérios onde o contexto não permitiu.
+4. "exemplary_moments" = momentos onde o vendedor foi ALÉM do esperado. Pode ser vazio se a performance foi apenas adequada.
+5. "coaching_notes" = orientações CONSTRUTIVAS e ESPECÍFICAS:
+   - Comece reconhecendo o que o vendedor fez BEM (pontos de aderência)
+   - Depois sugira melhorias PRÁTICAS referenciando critérios específicos da metodologia
+   - Use tom de mentor, não de juiz. O objetivo é desenvolvimento, não punição.
+   - Seja ESPECÍFICO: "Na próxima vez, tente usar a frase X do script de abertura antes de apresentar o produto" é melhor que "Melhore a abertura"
+6. TODOS os textos em português
+
+FORMATO DO JSON — inclua o campo "playbook_adherence":
+{
+  "playbook_adherence": {
+    "overall_adherence_score": 0-100,
+    "adherence_level": "non_compliant|partial|compliant|exemplary",
+    "dimensions": {
+      "opening": { "score": 0-100, "status": "not_evaluated|missed|partial|compliant|exemplary", "criteria_evaluated": [{ "criterion": "...", "type": "...", "weight": "...", "result": "...", "evidence": "trecho da transcrição", "points_earned": 0-100, "notes": "..." }], "dimension_feedback": "..." },
+      "closing": { ... },
+      "conduct": { ... },
+      "required_scripts": { ... },
+      "process": { ... }
+    },
+    "violations": [{ "criterion": "regra violada", "type": "prohibited", "severity": "critical|high|medium|low", "evidence": "trecho exato", "impact": "impacto da violação", "recommendation": "como corrigir" }],
+    "missed_requirements": [{ "criterion": "requisito não cumprido", "type": "required", "weight": "critical|high|medium|low", "expected": "o que deveria ter feito", "moment": "momento da call", "recommendation": "como implementar" }],
+    "exemplary_moments": [{ "criterion": "critério executado de forma exemplar", "evidence": "trecho da transcrição", "why_exemplary": "por que foi excepcional" }],
+    "playbook_summary": { "total_criteria_extracted": 0, "criteria_compliant": 0, "criteria_partial": 0, "criteria_missed": 0, "criteria_violated": 0, "criteria_not_applicable": 0, "critical_criteria_met": "X de Y", "compliance_rate": "XX%" },
+    "coaching_notes": "Orientações específicas referenciando critérios da metodologia"
+  }
+}`
   }
 
   console.log('📤 Enviando para OpenAI GPT-4o...')

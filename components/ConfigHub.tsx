@@ -1232,6 +1232,32 @@ function ConfigurationInterface({
           setPlaybook(saveResult.playbook)
           setPlaybookTitle(saveResult.playbook.title)
           showToast('success', 'Sucesso', `Playbook "${file.name}" salvo com sucesso!`)
+
+          // Trigger methodology generation (non-blocking)
+          if (saveResult.playbook?.id && userCompanyId) {
+            setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
+            fetch('/api/playbook/generate-methodology', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                playbookId: saveResult.playbook.id,
+                companyId: userCompanyId,
+              })
+            })
+              .then(res => res.json())
+              .then(result => {
+                if (result.success) {
+                  setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
+                  showToast('success', 'Metodologia Gerada', 'A metodologia personalizada foi extraída do playbook.')
+                } else {
+                  setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+                  showToast('warning', 'Atenção', 'Não foi possível gerar a metodologia automaticamente.')
+                }
+              })
+              .catch(() => {
+                setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+              })
+          }
         } else {
           showToast('error', 'Erro', saveResult.error || 'Não foi possível salvar o playbook. Tente novamente.')
         }
@@ -1383,6 +1409,31 @@ function ConfigurationInterface({
 
       showToast('success', 'Dados Salvos', 'Embeddings estão sendo gerados em segundo plano.')
       setCompanyDataEdited(false) // Resetar flag de edição após salvar
+
+      // Regenerate methodology if playbook exists (company data affects methodology context)
+      if (playbook?.id && companyId) {
+        setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
+        fetch('/api/playbook/generate-methodology', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playbookId: playbook.id,
+            companyId,
+          })
+        })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success) {
+              setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
+              showToast('success', 'Metodologia Atualizada', 'A metodologia foi regenerada com os novos dados da empresa.')
+            } else {
+              setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+            }
+          })
+          .catch(() => {
+            setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+          })
+      }
 
       // No modo onboarding, fechar ConfigHub após salvar para voltar à tela de cards
       if (onboardingMode && onClose) {
@@ -1550,6 +1601,28 @@ function ConfigurationInterface({
         showToast('warning', 'Arquivos Duplicados', `${skipped} arquivo(s) já enviado(s) anteriormente`)
       }
 
+      // Regenerate methodology if new files were uploaded and playbook exists
+      if (uploaded > 0 && playbook?.id && userCompanyId) {
+        setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
+        fetch('/api/playbook/generate-methodology', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playbookId: playbook.id, companyId: userCompanyId })
+        })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success) {
+              setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
+              showToast('success', 'Metodologia Atualizada', 'Novos documentos incorporados à metodologia.')
+            } else {
+              setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+            }
+          })
+          .catch(() => {
+            setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+          })
+      }
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
       setPdfError(errorMessage)
@@ -1587,6 +1660,27 @@ function ConfigurationInterface({
       // Remover da lista
       setSavedPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
       showToast('success', 'PDF Removido', 'Arquivo deletado com sucesso')
+
+      // Regenerate methodology if playbook exists (material changed)
+      if (playbook?.id && userCompanyId) {
+        setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
+        fetch('/api/playbook/generate-methodology', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playbookId: playbook.id, companyId: userCompanyId })
+        })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success) {
+              setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
+            } else {
+              setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+            }
+          })
+          .catch(() => {
+            setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+          })
+      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
@@ -5163,6 +5257,52 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
             </div>
 
+            {/* Methodology Card - shows when playbook exists */}
+            {playbook && (
+              <MethodologyCard
+                playbook={playbook}
+                companyId={userCompanyId}
+                onRegenerate={() => {
+                  if (!playbook?.id || !userCompanyId) return
+                  setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
+                  fetch('/api/playbook/generate-methodology', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playbookId: playbook.id, companyId: userCompanyId })
+                  })
+                    .then(res => res.json())
+                    .then(result => {
+                      if (result.success) {
+                        setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
+                        showToast('success', 'Metodologia Gerada', 'Metodologia regenerada com sucesso.')
+                      } else {
+                        setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+                        showToast('error', 'Erro', 'Não foi possível gerar a metodologia.')
+                      }
+                    })
+                    .catch(() => {
+                      setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
+                    })
+                }}
+                onDelete={() => {
+                  setPlaybook(prev => prev ? { ...prev, methodology: null, methodology_status: null } : null)
+                  // Clear in database too
+                  if (playbook?.id) {
+                    fetch('/api/playbook/save', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: playbook.title,
+                        content: playbook.content,
+                        companyId: userCompanyId,
+                      })
+                    }) // This triggers a version bump which resets methodology via the save route
+                  }
+                  showToast('success', 'Metodologia Removida', 'A metodologia foi apagada.')
+                }}
+              />
+            )}
+
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
@@ -6699,6 +6839,295 @@ function AIGeneratedObjectivesPreview({
             </>
           )}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// METHODOLOGY CARD COMPONENT
+// ============================================================
+
+const DIMENSION_LABELS: Record<string, { name: string; icon: string; color: string }> = {
+  opening: { name: 'Abertura', icon: '🎯', color: 'blue' },
+  closing: { name: 'Fechamento', icon: '🤝', color: 'green' },
+  conduct: { name: 'Conduta', icon: '📋', color: 'purple' },
+  required_scripts: { name: 'Scripts Obrigatórios', icon: '💬', color: 'orange' },
+  process: { name: 'Processo', icon: '⚙️', color: 'gray' },
+}
+
+const TYPE_STYLES: Record<string, { label: string; bg: string; text: string }> = {
+  required: { label: 'Obrigatório', bg: 'bg-green-100', text: 'text-green-700' },
+  recommended: { label: 'Recomendado', bg: 'bg-blue-100', text: 'text-blue-700' },
+  prohibited: { label: 'Proibido', bg: 'bg-red-100', text: 'text-red-700' },
+}
+
+const WEIGHT_STYLES: Record<string, { label: string; bg: string; text: string }> = {
+  critical: { label: 'Crítico', bg: 'bg-red-50', text: 'text-red-600' },
+  high: { label: 'Alto', bg: 'bg-orange-50', text: 'text-orange-600' },
+  medium: { label: 'Médio', bg: 'bg-gray-100', text: 'text-gray-600' },
+  low: { label: 'Baixo', bg: 'bg-gray-50', text: 'text-gray-400' },
+}
+
+function MethodologyCard({ playbook, companyId, onRegenerate, onDelete }: {
+  playbook: any
+  companyId: string | null
+  onRegenerate: () => void
+  onDelete: () => void
+}) {
+  const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set(['opening']))
+  const [expandedCriteria, setExpandedCriteria] = useState<Set<string>>(new Set())
+
+  const methodology = playbook?.methodology
+  const status = playbook?.methodology_status
+
+  const toggleDimension = (key: string) => {
+    setExpandedDimensions(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const toggleCriterion = (id: string) => {
+    setExpandedCriteria(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              Metodologia de Avaliação
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Critérios extraídos dos materiais de vendas para avaliar os vendedores.
+            </p>
+          </div>
+          {status === 'ready' && methodology?.summary && (
+            <div className="flex items-center gap-1.5">
+              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-semibold rounded-full">
+                {methodology.summary.total_criteria} critérios
+              </span>
+              {methodology.summary?.materials_analyzed > 1 && (
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium rounded-full">
+                  {methodology.summary.materials_analyzed} arquivos
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4">
+        {/* Generating state */}
+        {status === 'generating' && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-700">Analisando materiais de vendas...</p>
+              <p className="text-xs text-gray-400 mt-1">Extraindo metodologia personalizada (pode levar até 1 min)</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error state */}
+        {status === 'error' && (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <AlertCircle className="w-6 h-6 text-red-400" />
+            <p className="text-sm text-gray-600">Não foi possível gerar a metodologia.</p>
+            <button
+              onClick={onRegenerate}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Tentar Novamente
+            </button>
+          </div>
+        )}
+
+        {/* No methodology yet */}
+        {(!status || status === 'pending') && (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <Sparkles className="w-6 h-6 text-gray-300" />
+            <p className="text-sm text-gray-500">Nenhuma metodologia gerada ainda.</p>
+            <button
+              onClick={onRegenerate}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Gerar Metodologia
+            </button>
+          </div>
+        )}
+
+        {/* Ready state - show methodology */}
+        {status === 'ready' && methodology?.dimensions && (
+          <div className="space-y-3">
+            {/* Sales philosophy */}
+            {methodology.sales_philosophy && (
+              <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                <p className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider mb-1">Filosofia de Vendas</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{methodology.sales_philosophy}</p>
+              </div>
+            )}
+
+            {/* Summary bar */}
+            <div className="flex flex-wrap gap-2 pb-3 border-b border-gray-100">
+              {methodology.summary?.by_type?.required > 0 && (
+                <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-medium rounded-full">
+                  {methodology.summary.by_type.required} obrigatórios
+                </span>
+              )}
+              {methodology.summary?.by_type?.recommended > 0 && (
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-medium rounded-full">
+                  {methodology.summary.by_type.recommended} recomendados
+                </span>
+              )}
+              {methodology.summary?.by_type?.prohibited > 0 && (
+                <span className="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-medium rounded-full">
+                  {methodology.summary.by_type.prohibited} proibidos
+                </span>
+              )}
+              {methodology.summary?.by_weight?.critical > 0 && (
+                <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-semibold rounded-full border border-red-200">
+                  {methodology.summary.by_weight.critical} críticos
+                </span>
+              )}
+            </div>
+
+            {/* Dimensions */}
+            {Object.entries(DIMENSION_LABELS).map(([key, dim]) => {
+              const data = methodology.dimensions[key]
+              if (!data || data.status === 'not_found') return null
+              const isExpanded = expandedDimensions.has(key)
+              const criteriaCount = data.criteria?.length || 0
+
+              return (
+                <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => toggleDimension(key)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{dim.icon}</span>
+                      <span className="text-sm font-medium text-gray-800">{dim.name}</span>
+                      <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-[10px] font-medium rounded-full">
+                        {criteriaCount}
+                      </span>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-3 py-2 space-y-1">
+                      {data.dimension_summary && (
+                        <p className="text-xs text-gray-500 italic pb-2 border-b border-gray-100">
+                          {data.dimension_summary}
+                        </p>
+                      )}
+                      {data.criteria?.map((criterion: any) => {
+                        const typeStyle = TYPE_STYLES[criterion.type] || TYPE_STYLES.required
+                        const weightStyle = WEIGHT_STYLES[criterion.weight] || WEIGHT_STYLES.medium
+                        const isDetailExpanded = expandedCriteria.has(criterion.id)
+
+                        return (
+                          <div
+                            key={criterion.id}
+                            className="p-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                            onClick={() => toggleCriterion(criterion.id)}
+                          >
+                            <div className="flex items-start gap-2">
+                              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
+                                criterion.type === 'prohibited' ? 'bg-red-400' :
+                                criterion.type === 'required' ? 'bg-green-400' : 'bg-blue-400'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-sm text-gray-800 leading-snug">{criterion.criterion}</p>
+                                  <ChevronDown className={`w-3 h-3 text-gray-300 flex-shrink-0 mt-0.5 transition-transform ${isDetailExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${typeStyle.bg} ${typeStyle.text}`}>
+                                    {typeStyle.label}
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${weightStyle.bg} ${weightStyle.text}`}>
+                                    {weightStyle.label}
+                                  </span>
+                                </div>
+
+                                {/* Expanded detail */}
+                                {isDetailExpanded && (
+                                  <div className="mt-2 space-y-2 border-t border-gray-100 pt-2">
+                                    {criterion.detailed_description && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">O que é esperado</p>
+                                        <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{criterion.detailed_description}</p>
+                                      </div>
+                                    )}
+                                    {criterion.evaluation_guidance && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider">Como avaliar</p>
+                                        <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{criterion.evaluation_guidance}</p>
+                                      </div>
+                                    )}
+                                    {criterion.source_excerpt && (
+                                      <div className="p-2 bg-gray-50 rounded border border-gray-200">
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Fonte no material</p>
+                                        <p className="text-[11px] text-gray-500 italic leading-snug">
+                                          &ldquo;{criterion.source_excerpt}&rdquo;
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Actions */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-[10px] text-gray-400">
+                Gerada em {new Date(methodology.generated_at).toLocaleDateString('pt-BR')} às {new Date(methodology.generated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onDelete}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Apagar
+                </button>
+                <button
+                  onClick={onRegenerate}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Regenerar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

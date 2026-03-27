@@ -165,9 +165,10 @@ DIRETRIZES CRÍTICAS
 5. NÃO DEIXE NENHUMA OBJEÇÃO PASSAR EM BRANCO — faça varredura completa de toda a transcrição antes de finalizar a análise de objeções
 6. Todas as objeções devem ter "source": "discovered" pois são identificadas pela IA na venda real`
 
-const PLAYBOOK_SECTION = `
+// PLAYBOOK_SECTION removido — metodologia pré-extraída é obrigatória agora
+const _PLAYBOOK_SECTION_REMOVED = `
 
-=== CARD: PLAYBOOK ADHERENCE ===
+=== CARD: PLAYBOOK ADHERENCE (LEGACY - NÃO USADO) ===
 
 CONTEXTO DA EMPRESA:
 - Nome da empresa: {company_name}
@@ -363,6 +364,7 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
   let companyType = 'Não informado'
   let companyContext = ''
   let playbookContent: string | null = null
+  let playbookMethodology: any = null
 
   if (companyId) {
     const { data: company } = await supabaseAdmin
@@ -405,7 +407,7 @@ Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados
 
     const { data: playbook } = await supabaseAdmin
       .from('sales_playbooks')
-      .select('content')
+      .select('content, methodology, methodology_status')
       .eq('company_id', companyId)
       .eq('is_active', true)
       .single()
@@ -413,6 +415,10 @@ Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados
     if (playbook?.content) {
       playbookContent = playbook.content
       console.log('[MeetBG] Playbook encontrado, incluindo na avaliação')
+      if (playbook.methodology_status === 'ready' && playbook.methodology) {
+        playbookMethodology = playbook.methodology
+        console.log('[MeetBG] Metodologia pré-extraída disponível')
+      }
     }
   }
 
@@ -444,12 +450,87 @@ ${companyContext}
 
 ⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve impactar negativamente a nota de N (Necessidade de Solução) e ser mencionado em critical_gaps.` : ''}`
 
-  if (playbookContent) {
-    userPrompt += PLAYBOOK_SECTION
-      .replace('{company_name}', companyName)
-      .replace('{company_description}', companyDescription)
-      .replace('{company_type}', companyType)
-      .replace('{playbook_content}', playbookContent)
+  // Avaliação de aderência ao playbook (requer metodologia pré-extraída)
+  if (playbookMethodology?.dimensions) {
+    const methodologyJson = JSON.stringify(playbookMethodology.dimensions, null, 2)
+    userPrompt += `
+
+=== CARD: PLAYBOOK ADHERENCE ===
+
+CONTEXTO COMPLETO DA EMPRESA:
+- Nome: ${companyName}
+- Descrição: ${companyDescription}
+- Tipo: ${companyType}
+${companyContext ? `\nDADOS DA EMPRESA:\n${companyContext}` : ''}
+${playbookMethodology.sales_philosophy ? `\nFILOSOFIA DE VENDAS DA EMPRESA:\n${playbookMethodology.sales_philosophy}` : ''}
+${playbookMethodology.target_audience ? `\nPÚBLICO-ALVO:\n${playbookMethodology.target_audience}` : ''}
+
+A empresa possui uma METODOLOGIA DE VENDAS PERSONALIZADA extraída dos seus materiais. Você DEVE usar esta metodologia para avaliar a aderência do vendedor.
+
+=== METODOLOGIA DA EMPRESA (CRITÉRIOS OBRIGATÓRIOS) ===
+${methodologyJson}
+=== FIM DA METODOLOGIA ===
+${playbookContent ? `
+MATERIAIS COMPLETOS DA EMPRESA (use para buscar evidências e trechos específicos):
+--- INÍCIO DOS MATERIAIS ---
+${playbookContent}
+--- FIM DOS MATERIAIS ---
+` : ''}
+COMO AVALIAR CADA CRITÉRIO:
+
+Cada critério contém:
+- "criterion": O que avaliar
+- "detailed_description": O que EXATAMENTE é esperado do vendedor
+- "evaluation_guidance": COMO VERIFICAR na transcrição se o vendedor cumpriu
+- "type": required | recommended | prohibited
+- "weight": critical | high | medium | low
+
+PROCESSO:
+1. Para CADA critério, leia "evaluation_guidance" e busque evidências na transcrição
+2. ANTES de classificar, pergunte-se: "O vendedor teve oportunidade real de executar?"
+3. Classifique cada critério:
+
+result         | Quando usar                                                                | points_earned
+compliant      | Vendedor executou corretamente conforme descrito                            | 100
+partial        | Vendedor TENTOU mas a execução teve falhas — valorize o esforço             | 50
+missed         | Vendedor tinha oportunidade CLARA E INEQUÍVOCA mas ignorou                  | 0
+violated       | Vendedor fez EXATAMENTE O OPOSTO do esperado (APENAS para "prohibited")     | -50
+not_applicable | Vendedor NÃO TEVE oportunidade de executar                                 | N/A (exclui)
+
+4. Inclua trecho EXATO da transcrição como evidência
+
+REGRAS DE JUSTIÇA:
+
+Use "not_applicable" quando:
+- A reunião não chegou a esse ponto (foi curta, interrompida, ou de tipo diferente)
+- O critério exige situação que não ocorreu (ex: script de objeção de preço mas cliente não objetou)
+- O vendedor tentou direcionar mas o contexto não permitiu
+- A transcrição está incompleta ou com falhas de captura
+
+Use "missed" APENAS quando:
+- Houve oportunidade CLARA e o vendedor não agiu
+- Há um momento específico na transcrição onde era óbvio que deveria ter executado
+
+Use "partial" quando:
+- Vendedor tentou mas fez de forma incompleta ou com erros menores
+- Vendedor demonstrou conhecimento mas a execução não foi perfeita
+- Vendedor adaptou o critério de forma razoável mas diferente do ideal
+
+REGRA DE OURO: Na dúvida entre "missed" e "not_applicable", escolha "not_applicable". Na dúvida entre "missed" e "partial", escolha "partial".
+
+CÁLCULOS:
+- weight_multiplier: critical=3, high=2, medium=1, low=0.5
+- Pesos: opening 20%, closing 25%, conduct 20%, required_scripts 20%, process 15%
+- Se dimensão "not_evaluated" ou todos critérios "not_applicable", redistribua peso
+- adherence_level: exemplary (90-100%), compliant (70-89%), partial (50-69%), non_compliant (0-49%)
+
+REGRAS ESPECIAIS:
+- "violations" = APENAS regras PROIBIDAS ATIVAMENTE VIOLADAS (fez o contrário). Array VAZIO [] se não houve.
+- "missed_requirements" = apenas critérios IGNORADOS com oportunidade clara. NÃO inclua quando contexto não permitiu.
+- "coaching_notes" = tom construtivo: comece com o que o vendedor fez BEM, depois sugira melhorias ESPECÍFICAS referenciando critérios da metodologia
+- TODOS os textos em português
+
+Inclua "playbook_adherence" no JSON com: overall_adherence_score, adherence_level, dimensions, violations, missed_requirements, exemplary_moments, playbook_summary, coaching_notes.`
   }
 
   console.log('[MeetBG] Enviando para OpenAI...')
