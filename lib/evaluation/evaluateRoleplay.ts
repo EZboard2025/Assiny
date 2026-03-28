@@ -604,7 +604,8 @@ Dados da empresa para validar informações do vendedor:
 
 ⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou na transcrição (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve zerar o indicador N4 (Credibilidade e Confiança) e ser mencionado em critical_gaps.`
 
-// PLAYBOOK_SECTION removido — metodologia pré-extraída é obrigatória agora
+// PLAYBOOK_SECTION legacy removido — metodologia pré-extraída é obrigatória
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _PLAYBOOK_SECTION_REMOVED = `
 
 === CARD: PLAYBOOK ADHERENCE (LEGACY - NÃO USADO) ===
@@ -907,11 +908,9 @@ missed         | Vendedor tinha oportunidade CLARA e INEQUÍVOCA mas ignorou ou 
 violated       | Vendedor fez EXATAMENTE O OPOSTO do esperado (APENAS para "prohibited")     | -50
 not_applicable | Vendedor NÃO TEVE oportunidade de executar (ver regras abaixo)              | N/A (exclui)
 
-4. Para cada critério avaliado, inclua:
-   - O trecho EXATO da transcrição como evidência
-   - Se "missed": explique qual foi o momento onde o vendedor DEVERIA ter agido
-   - Se "not_applicable": explique brevemente por que não se aplicou
-   - Notas específicas quando relevante
+4. Para CADA critério avaliado, preencha TODOS os campos:
+   - "evidence": Trecho LITERAL da transcrição entre aspas (copie exatamente a fala do vendedor/cliente). Se "missed", cite o momento da conversa onde deveria ter agido (ex: "Após o cliente dizer 'Quanto custa?', o vendedor poderia ter..."). Se "not_applicable", escreva "Contexto não permitiu: [razão]".
+   - "notes": OBRIGATÓRIO — Explique o que o vendedor FEZ vs o que DEVERIA ter feito segundo a metodologia. Seja específico. Ex: "O vendedor disse 'nosso produto é bom' mas a metodologia pede que mencione o diferencial específico de [X]. Deveria ter dito algo como '[frase do playbook]'."
 
 REGRAS DE JUSTIÇA — "missed" vs "not_applicable":
 
@@ -956,14 +955,20 @@ adherence_level:
 REGRAS ESPECIAIS:
 1. Dimensões com status "not_found" na metodologia → "not_evaluated", excluir do cálculo
 2. "violations" = APENAS regras PROIBIDAS que o vendedor ATIVAMENTE VIOLOU (fez o oposto). Array VAZIO [] se não houve violações. NÃO confunda "não fez" com "violou" — violar é fazer o contrário.
-3. "missed_requirements" = critérios obrigatórios que o vendedor IGNOROU apesar de ter oportunidade CLARA. NÃO inclua critérios onde o contexto não permitiu.
-4. "exemplary_moments" = momentos onde o vendedor foi ALÉM do esperado. Pode ser vazio se a performance foi apenas adequada.
-5. "coaching_notes" = orientações CONSTRUTIVAS e ESPECÍFICAS:
-   - Comece reconhecendo o que o vendedor fez BEM (pontos de aderência)
-   - Depois sugira melhorias PRÁTICAS referenciando critérios específicos da metodologia
-   - Use tom de mentor, não de juiz. O objetivo é desenvolvimento, não punição.
-   - Seja ESPECÍFICO: "Na próxima vez, tente usar a frase X do script de abertura antes de apresentar o produto" é melhor que "Melhore a abertura"
-6. TODOS os textos em português
+3. "missed_requirements" = critérios obrigatórios que o vendedor IGNOROU apesar de ter oportunidade CLARA. Para cada requisito não cumprido, INCLUA:
+   - "expected": O que o playbook/metodologia diz que deveria ser feito (cite trecho do material)
+   - "moment": O momento EXATO da conversa onde deveria ter agido (ex: "Quando o cliente disse: 'E como funciona o preço?'")
+   - "recommendation": Exemplo CONCRETO do que deveria ter dito (ex: "Deveria ter usado o script: 'Antes de falar de investimento, deixa eu entender melhor sua operação...'")
+4. "exemplary_moments" = momentos onde o vendedor executou um critério de forma EXCELENTE. SEMPRE inclua pelo menos 1 se o vendedor fez algo bem (todo vendedor tem pontos positivos). Para cada momento:
+   - "evidence": Trecho LITERAL da transcrição mostrando o acerto
+   - "why_exemplary": Por que foi bom COMPARADO ao que a metodologia pede (ex: "A metodologia pede X e o vendedor fez X de forma natural e personalizada")
+5. "dimension_feedback" (em CADA dimensão) = Feedback DESCRITIVO de 2-3 frases explicando o score, com TRECHOS da transcrição. Não apenas "boa abertura" — explique O QUE foi bom ou ruim com evidências.
+6. "coaching_notes" = ESTRUTURADO em 3 partes:
+   PARTE 1 - O QUE VOCÊ FEZ BEM: Liste 2-3 acertos específicos com trechos da transcrição. Ex: "Você acertou ao dizer '[trecho]' — isso está alinhado com o critério de abertura da metodologia."
+   PARTE 2 - O QUE MELHORAR: Para cada ponto, mostre: (a) o que você fez, (b) o que a metodologia pede, (c) como deveria ter falado. Ex: "Você disse '[trecho do vendedor]', mas a metodologia pede que '[trecho do playbook]'. Na próxima vez, tente algo como: '[exemplo de fala correta]'."
+   PARTE 3 - PRÓXIMO PASSO: Uma ação concreta e prioritária para a próxima simulação.
+   Separe as partes com quebras de linha. Tom de mentor, não de juiz.
+7. TODOS os textos em português
 
 FORMATO DO JSON — inclua o campo "playbook_adherence":
 {
@@ -971,17 +976,32 @@ FORMATO DO JSON — inclua o campo "playbook_adherence":
     "overall_adherence_score": 0-100,
     "adherence_level": "non_compliant|partial|compliant|exemplary",
     "dimensions": {
-      "opening": { "score": 0-100, "status": "not_evaluated|missed|partial|compliant|exemplary", "criteria_evaluated": [{ "criterion": "...", "type": "...", "weight": "...", "result": "...", "evidence": "trecho da transcrição", "points_earned": 0-100, "notes": "..." }], "dimension_feedback": "..." },
-      "closing": { ... },
-      "conduct": { ... },
-      "required_scripts": { ... },
-      "process": { ... }
+      "opening": {
+        "score": 0-100,
+        "status": "not_evaluated|missed|partial|compliant|exemplary",
+        "criteria_evaluated": [
+          {
+            "criterion": "Nome do critério da metodologia",
+            "type": "required|recommended|prohibited",
+            "weight": "critical|high|medium|low",
+            "result": "compliant|partial|missed|violated|not_applicable",
+            "evidence": "TRECHO LITERAL da transcrição: 'Vendedor: ... / Cliente: ...' (copie exatamente). Se missed: descreva o momento onde deveria ter agido.",
+            "points_earned": 100,
+            "notes": "OBRIGATÓRIO: O que o vendedor fez vs o que deveria ter feito. Referencie a metodologia. Ex: 'O vendedor apresentou o produto sem pedir permissão. A metodologia exige: [trecho do playbook]. Deveria ter dito: [exemplo].'"
+          }
+        ],
+        "dimension_feedback": "Feedback de 2-3 frases com TRECHOS da transcrição explicando o score. Ex: 'O vendedor abriu com [trecho], demonstrando boa energia mas sem seguir o script de abertura que pede [trecho do playbook].'"
+      },
+      "closing": { "..." },
+      "conduct": { "..." },
+      "required_scripts": { "..." },
+      "process": { "..." }
     },
-    "violations": [{ "criterion": "regra violada", "type": "prohibited", "severity": "critical|high|medium|low", "evidence": "trecho exato", "impact": "impacto da violação", "recommendation": "como corrigir" }],
-    "missed_requirements": [{ "criterion": "requisito não cumprido", "type": "required", "weight": "critical|high|medium|low", "expected": "o que deveria ter feito", "moment": "momento da call", "recommendation": "como implementar" }],
-    "exemplary_moments": [{ "criterion": "critério executado de forma exemplar", "evidence": "trecho da transcrição", "why_exemplary": "por que foi excepcional" }],
+    "violations": [{ "criterion": "regra violada", "type": "prohibited", "severity": "critical|high|medium|low", "evidence": "TRECHO EXATO da transcrição onde violou", "impact": "impacto concreto da violação", "recommendation": "como corrigir com exemplo de fala" }],
+    "missed_requirements": [{ "criterion": "requisito não cumprido", "type": "required", "weight": "critical|high|medium|low", "expected": "O que a metodologia/playbook diz (cite trecho do material)", "moment": "Momento EXATO da conversa: 'Quando o cliente disse: [trecho]'", "recommendation": "Exemplo concreto do que deveria ter dito: '[fala sugerida]'" }],
+    "exemplary_moments": [{ "criterion": "critério executado de forma exemplar", "evidence": "TRECHO LITERAL da transcrição mostrando o acerto: 'Vendedor: ...'", "why_exemplary": "Por que foi bom comparado ao que a metodologia pede" }],
     "playbook_summary": { "total_criteria_extracted": 0, "criteria_compliant": 0, "criteria_partial": 0, "criteria_missed": 0, "criteria_violated": 0, "criteria_not_applicable": 0, "critical_criteria_met": "X de Y", "compliance_rate": "XX%" },
-    "coaching_notes": "Orientações específicas referenciando critérios da metodologia"
+    "coaching_notes": "ESTRUTURADO:\n\nO QUE VOCÊ FEZ BEM:\n- [acerto 1 com trecho da transcrição]\n- [acerto 2]\n\nO QUE MELHORAR:\n- [ponto 1: o que fez → o que a metodologia pede → como deveria falar]\n- [ponto 2]\n\nPRÓXIMO PASSO:\n[ação concreta prioritária]"
   }
 }`
   }
@@ -996,8 +1016,8 @@ FORMATO DO JSON — inclua o campo "playbook_adherence":
       { role: 'user', content: userPrompt }
     ],
     response_format: { type: 'json_object' },
-    temperature: 0.3, // Mais consistente para avaliações
-    max_tokens: 10000
+    temperature: 0.3,
+    max_tokens: 16000 // SPIN + objeções + playbook_adherence requer bastante espaço
   })
 
   const content = response.choices[0].message.content

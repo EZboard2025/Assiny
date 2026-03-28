@@ -113,6 +113,13 @@ ETAPA 4 — ORGANIZAR NAS 5 DIMENSÕES
 5. CONTEXTO ESPECÍFICO: "Mencionar que a empresa tem 500+ clientes ativos" é melhor que "Usar prova social".
 6. PROIBIÇÕES ESPECÍFICAS: "Nunca dizer 'é barato'" é melhor que "Evitar linguagem negativa sobre preço".
 7. source_excerpt deve ser um trecho LITERAL e extenso do material (até 300 caracteres), não um resumo.
+8. APENAS CRITÉRIOS VERIFICÁVEIS NA CONVERSA: Esta metodologia será usada para avaliar TRANSCRIÇÕES de vendas (simulações ou reuniões reais). Só inclua critérios que podem ser verificados OUVINDO ou LENDO a conversa. EXCLUA critérios sobre:
+   - Ações fora da conversa (ex: "pesquisar no CRM antes de ligar", "preencher relatório após a call", "enviar e-mail de follow-up")
+   - Preparação prévia que não é visível na conversa (ex: "estudar o LinkedIn do prospect", "ler o site da empresa")
+   - Métricas operacionais (ex: "fazer X ligações por dia", "manter taxa de conversão de Y%")
+   - Processos internos de documentação (ex: "atualizar o pipeline", "registrar no sistema")
+   Se o material menciona esses critérios, IGNORE-OS — eles não podem ser avaliados numa transcrição.
+   PORÉM: Se o critério é sobre DEMONSTRAR que fez pesquisa prévia (ex: "mencionar algo específico do prospect que mostre que pesquisou"), aí SIM é verificável na conversa e deve ser incluído.
 
 === FORMATO JSON DE RESPOSTA ===
 

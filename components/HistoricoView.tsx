@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft, FileText, FileAudio } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft, FileText, FileAudio, Star } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 import { useNotifications } from '@/hooks/useNotifications'
 import { supabase } from '@/lib/supabase'
@@ -1045,9 +1045,9 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
                                     </div>
                                   </div>
 
-                                  {/* Dimensões do Playbook */}
+                                  {/* Dimensões do Playbook — clicáveis para expandir critérios */}
                                   {pa.dimensions && (
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    <div className="space-y-2">
                                       {[
                                         { key: 'opening', label: 'Abertura', icon: '🎯' },
                                         { key: 'closing', label: 'Fechamento', icon: '🤝' },
@@ -1055,21 +1055,88 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
                                         { key: 'required_scripts', label: 'Scripts', icon: '📝' },
                                         { key: 'process', label: 'Processo', icon: '⚙️' }
                                       ].map(({ key, label, icon }) => {
-                                        const dim = pa.dimensions?.[key as keyof typeof pa.dimensions]
+                                        const dim = pa.dimensions?.[key as keyof typeof pa.dimensions] as any
                                         if (!dim || dim.status === 'not_evaluated') return null
+                                        const isExpanded = expandedSection === `pb_dim_${key}`
                                         return (
-                                          <div key={key} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-                                            <div className="text-xl mb-1">{icon}</div>
-                                            <div className={`text-2xl font-bold ${
-                                              (dim.score || 0) >= 70 ? 'text-green-600' :
-                                              (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
-                                            }`}>
-                                              {dim.score || 0}%
-                                            </div>
-                                            <div className="text-xs text-gray-500">{label}</div>
+                                          <div key={key} className="border border-gray-200 rounded-xl overflow-hidden">
+                                            <button
+                                              onClick={() => setExpandedSection(isExpanded ? 'playbook' : `pb_dim_${key}`)}
+                                              className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                                            >
+                                              <div className="flex items-center gap-3">
+                                                <span className="text-lg">{icon}</span>
+                                                <span className="text-sm font-medium text-gray-800">{label}</span>
+                                                <span className={`text-lg font-bold ${
+                                                  (dim.score || 0) >= 70 ? 'text-green-600' :
+                                                  (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                                }`}>
+                                                  {dim.score || 0}%
+                                                </span>
+                                              </div>
+                                              {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                                            </button>
+                                            {isExpanded && (
+                                              <div className="px-3 pb-3 border-t border-gray-100 pt-3 space-y-2">
+                                                {dim.dimension_feedback && (
+                                                  <p className="text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 leading-relaxed">{dim.dimension_feedback}</p>
+                                                )}
+                                                {dim.criteria_evaluated?.map((c: any, ci: number) => (
+                                                  <div key={ci} className={`text-sm rounded-lg p-3 border ${
+                                                    c.result === 'compliant' ? 'bg-green-50/50 border-green-200' :
+                                                    c.result === 'partial' ? 'bg-yellow-50/50 border-yellow-200' :
+                                                    c.result === 'violated' ? 'bg-red-50/50 border-red-200' :
+                                                    c.result === 'missed' ? 'bg-orange-50/50 border-orange-200' :
+                                                    'bg-gray-50/50 border-gray-200'
+                                                  }`}>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                      <span className={`text-xs font-semibold ${
+                                                        c.result === 'compliant' ? 'text-green-600' :
+                                                        c.result === 'partial' ? 'text-yellow-600' :
+                                                        c.result === 'violated' ? 'text-red-600' :
+                                                        c.result === 'missed' ? 'text-orange-600' :
+                                                        'text-gray-400'
+                                                      }`}>
+                                                        {c.result === 'compliant' ? '✓ Conforme' :
+                                                         c.result === 'partial' ? '⚠ Parcial' :
+                                                         c.result === 'violated' ? '✗ Violado' :
+                                                         c.result === 'missed' ? '✗ Perdido' :
+                                                         '○ N/A'}
+                                                      </span>
+                                                      <span className="text-gray-800 font-medium">{c.criterion}</span>
+                                                    </div>
+                                                    {c.evidence && c.result !== 'not_applicable' && (
+                                                      <p className="text-xs text-gray-500 italic mt-1 bg-white/60 rounded p-1.5 leading-relaxed">&ldquo;{c.evidence}&rdquo;</p>
+                                                    )}
+                                                    {c.notes && (
+                                                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">{c.notes}</p>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
                                         )
                                       })}
+                                    </div>
+                                  )}
+
+                                  {/* Acertos do Vendedor */}
+                                  {pa.exemplary_moments && pa.exemplary_moments.length > 0 && (
+                                    <div className="bg-green-50 rounded-2xl border border-green-200 p-5">
+                                      <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
+                                        <Star className="w-4 h-4" />
+                                        Acertos do Vendedor
+                                      </h4>
+                                      <ul className="space-y-2">
+                                        {pa.exemplary_moments.map((em: any, i: number) => (
+                                          <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-green-100">
+                                            <div className="font-medium text-green-700">{em.criterion}</div>
+                                            {em.evidence && <p className="text-xs text-gray-500 mt-1 italic bg-green-50/50 rounded p-1.5">&ldquo;{em.evidence}&rdquo;</p>}
+                                            {em.why_exemplary && <p className="text-xs text-green-600 mt-1">{em.why_exemplary}</p>}
+                                          </li>
+                                        ))}
+                                      </ul>
                                     </div>
                                   )}
 
@@ -1084,8 +1151,9 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
                                         {pa.violations.map((v: any, i: number) => (
                                           <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-red-100">
                                             <div className="font-medium text-red-700">{v.criterion}</div>
-                                            {v.evidence && <p className="text-xs text-gray-500 mt-1 italic">"{v.evidence}"</p>}
-                                            {v.recommendation && <p className="text-xs text-red-600 mt-1">{v.recommendation}</p>}
+                                            {v.evidence && <p className="text-xs text-gray-500 mt-1 italic bg-red-50/50 rounded p-1.5">&ldquo;{v.evidence}&rdquo;</p>}
+                                            {v.impact && <p className="text-xs text-red-500 mt-1">Impacto: {v.impact}</p>}
+                                            {v.recommendation && <p className="text-xs text-red-600 mt-1 font-medium">{v.recommendation}</p>}
                                           </li>
                                         ))}
                                       </ul>
@@ -1098,39 +1166,35 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
                                   </div>
 
                                   {/* Requisitos Não Cumpridos */}
-                                  <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
-                                    <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
-                                      <AlertCircle className="w-4 h-4" />
-                                      Requisitos Não Cumpridos
-                                    </h4>
-                                    {pa.missed_requirements && pa.missed_requirements.length > 0 ? (
+                                  {pa.missed_requirements && pa.missed_requirements.length > 0 && (
+                                    <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
+                                      <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
+                                        <AlertCircle className="w-4 h-4" />
+                                        Requisitos Não Cumpridos
+                                      </h4>
                                       <ul className="space-y-2">
                                         {pa.missed_requirements.map((m: any, i: number) => (
                                           <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-amber-100">
                                             <div className="font-medium text-amber-700">{m.criterion}</div>
-                                            {m.expected && <p className="text-xs text-gray-500 mt-1">Esperado: {m.expected}</p>}
-                                            {m.recommendation && <p className="text-xs text-amber-600 mt-1">{m.recommendation}</p>}
+                                            {m.moment && <p className="text-xs text-gray-500 mt-1 italic bg-amber-50/50 rounded p-1.5">{m.moment}</p>}
+                                            {m.expected && <p className="text-xs text-gray-600 mt-1"><span className="font-medium">Esperado:</span> {m.expected}</p>}
+                                            {m.recommendation && <p className="text-xs text-amber-600 mt-1 font-medium">{m.recommendation}</p>}
                                           </li>
                                         ))}
                                       </ul>
-                                    ) : (
-                                      <p className="text-sm text-green-600 flex items-center gap-2">
-                                        <CheckCircle className="w-4 h-4" />
-                                        Todos os requisitos foram cumpridos
-                                      </p>
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
 
-                                  {/* Notas de Coaching */}
+                                  {/* Orientações para Melhorar */}
                                   {pa.coaching_notes && (
                                     <div className="bg-blue-50 rounded-2xl border border-blue-200 p-5">
                                       <h4 className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-3">
                                         <Lightbulb className="w-4 h-4" />
                                         Orientações para Melhorar
                                       </h4>
-                                      <p className="text-sm text-gray-700 leading-relaxed">
+                                      <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                                         {pa.coaching_notes}
-                                      </p>
+                                      </div>
                                     </div>
                                   )}
 

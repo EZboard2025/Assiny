@@ -497,26 +497,20 @@ missed         | Vendedor tinha oportunidade CLARA E INEQUÍVOCA mas ignorou    
 violated       | Vendedor fez EXATAMENTE O OPOSTO do esperado (APENAS para "prohibited")     | -50
 not_applicable | Vendedor NÃO TEVE oportunidade de executar                                 | N/A (exclui)
 
-4. Inclua trecho EXATO da transcrição como evidência
+4. Para CADA critério, preencha TODOS os campos:
+   - "evidence": Trecho LITERAL da transcrição (copie exatamente). Se "missed", cite o momento onde deveria ter agido. Se "not_applicable", escreva "Contexto não permitiu: [razão]".
+   - "notes": OBRIGATÓRIO — O que o vendedor FEZ vs o que DEVERIA ter feito segundo a metodologia, com exemplos.
 
 REGRAS DE JUSTIÇA:
 
 Use "not_applicable" quando:
-- A reunião não chegou a esse ponto (foi curta, interrompida, ou de tipo diferente)
-- O critério exige situação que não ocorreu (ex: script de objeção de preço mas cliente não objetou)
-- O vendedor tentou direcionar mas o contexto não permitiu
+- A reunião não chegou a esse ponto ou é de tipo diferente
+- O critério exige situação que não ocorreu
 - A transcrição está incompleta ou com falhas de captura
 
-Use "missed" APENAS quando:
-- Houve oportunidade CLARA e o vendedor não agiu
-- Há um momento específico na transcrição onde era óbvio que deveria ter executado
-
-Use "partial" quando:
-- Vendedor tentou mas fez de forma incompleta ou com erros menores
-- Vendedor demonstrou conhecimento mas a execução não foi perfeita
-- Vendedor adaptou o critério de forma razoável mas diferente do ideal
-
-REGRA DE OURO: Na dúvida entre "missed" e "not_applicable", escolha "not_applicable". Na dúvida entre "missed" e "partial", escolha "partial".
+Use "missed" APENAS quando houve oportunidade CLARA e o vendedor não agiu.
+Use "partial" quando o vendedor tentou mas a execução não foi perfeita — valorize o esforço.
+REGRA DE OURO: Na dúvida, nunca penalize.
 
 CÁLCULOS:
 - weight_multiplier: critical=3, high=2, medium=1, low=0.5
@@ -525,12 +519,17 @@ CÁLCULOS:
 - adherence_level: exemplary (90-100%), compliant (70-89%), partial (50-69%), non_compliant (0-49%)
 
 REGRAS ESPECIAIS:
-- "violations" = APENAS regras PROIBIDAS ATIVAMENTE VIOLADAS (fez o contrário). Array VAZIO [] se não houve.
-- "missed_requirements" = apenas critérios IGNORADOS com oportunidade clara. NÃO inclua quando contexto não permitiu.
-- "coaching_notes" = tom construtivo: comece com o que o vendedor fez BEM, depois sugira melhorias ESPECÍFICAS referenciando critérios da metodologia
+- "violations" = APENAS regras PROIBIDAS ATIVAMENTE VIOLADAS. Array VAZIO [] se não houve.
+- "missed_requirements": Para cada requisito, inclua "expected" (trecho do playbook), "moment" (momento EXATO da conversa), "recommendation" (exemplo concreto de fala correta).
+- "exemplary_moments": SEMPRE inclua pelo menos 1 se o vendedor fez algo bem. Inclua "evidence" (trecho literal) e "why_exemplary" (por que foi bom comparado à metodologia).
+- "dimension_feedback": Em CADA dimensão, feedback de 2-3 frases com TRECHOS da transcrição explicando o score.
+- "coaching_notes": ESTRUTURADO em 3 partes:
+  PARTE 1 - O QUE VOCÊ FEZ BEM: 2-3 acertos com trechos da transcrição.
+  PARTE 2 - O QUE MELHORAR: Para cada ponto: (a) o que fez, (b) o que a metodologia pede, (c) exemplo de fala correta.
+  PARTE 3 - PRÓXIMO PASSO: Ação concreta prioritária.
 - TODOS os textos em português
 
-Inclua "playbook_adherence" no JSON com: overall_adherence_score, adherence_level, dimensions, violations, missed_requirements, exemplary_moments, playbook_summary, coaching_notes.`
+Inclua "playbook_adherence" no JSON com a estrutura completa: overall_adherence_score, adherence_level, dimensions (com criteria_evaluated detalhado + dimension_feedback rico), violations, missed_requirements, exemplary_moments, playbook_summary, coaching_notes.`
   }
 
   console.log('[MeetBG] Enviando para OpenAI...')
