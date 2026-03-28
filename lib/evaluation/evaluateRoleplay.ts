@@ -769,95 +769,39 @@ Inclua no JSON de resposta o campo "playbook_adherence":
 }
 `
 
-export async function evaluateRoleplay(params: EvaluationParams): Promise<RoleplayEvaluation> {
-  const { transcription, clientProfile, objetivo, companyId } = params
+// ===== AGENTE DE PLAYBOOK ADHERENCE (roda em paralelo com SPIN) =====
 
-  console.log('🤖 Iniciando avaliação direta via OpenAI...')
+const PLAYBOOK_SYSTEM_PROMPT = `Você é um avaliador especializado em verificar a aderência de vendedores à metodologia de vendas da empresa. Você recebe uma transcrição de conversa de vendas e a metodologia extraída dos materiais da empresa, e avalia critério por critério se o vendedor seguiu as regras.
 
-  // 1. Buscar dados da empresa para validação
-  let companyContext = 'Dados da empresa não disponíveis'
-  let playbookContent: string | null = null
-  let playbookMethodology: any = null
+Você é rigoroso mas justo. Avalie apenas o que o vendedor CONTROLAVA — não penalize por limitações da simulação ou do cliente.
 
-  // Variáveis para contexto do playbook
-  let companyName = 'Não informado'
-  let companyDescription = 'Não informado'
-  let companyType = 'Não informado'
+CONTEXTO DE SIMULAÇÃO:
+- Esta pode ser uma SIMULAÇÃO de vendas (roleplay), não necessariamente uma ligação real
+- NÃO penalize o vendedor por comportamentos do cliente IA (encerrar prematuramente, não dar abertura, etc.)
+- Foque no que o vendedor DISSE e FEZ, não no que o cliente permitiu ou não
 
-  if (companyId) {
-    // Buscar nome da empresa
-    const { data: company } = await supabaseAdmin
-      .from('companies')
-      .select('name')
-      .eq('id', companyId)
-      .single()
+Responda APENAS em JSON válido (sem markdown). Todos os textos em português.`
 
-    if (company?.name) {
-      companyName = company.name
-    }
+interface PlaybookEvalParams {
+  transcription: string
+  companyName: string
+  companyDescription: string
+  companyType: string
+  companyContext: string
+  playbookMethodology: any
+  playbookContent: string
+}
 
-    // Buscar tipo da empresa (B2B/B2C)
-    const { data: typeData } = await supabaseAdmin
-      .from('company_type')
-      .select('type')
-      .eq('company_id', companyId)
-      .single()
+async function evaluatePlaybookAdherence(params: PlaybookEvalParams): Promise<PlaybookAdherence> {
+  const { transcription, companyName, companyDescription, companyType, companyContext, playbookMethodology, playbookContent } = params
 
-    if (typeData?.type) {
-      companyType = typeData.type
-    }
+  const methodologyJson = JSON.stringify(playbookMethodology.dimensions, null, 2)
 
-    // Buscar dados da empresa
-    const { data: companyData } = await supabaseAdmin
-      .from('company_data')
-      .select('*')
-      .eq('company_id', companyId)
-      .single()
+  const userPrompt = `Avalie a aderência do vendedor à metodologia da empresa com base na transcrição abaixo.
 
-    if (companyData) {
-      companyDescription = companyData.descricao || 'Não informado'
-      companyContext = `Nome: ${companyData.nome || companyName}
-Descrição: ${companyData.descricao || 'Não informado'}
-Produtos/Serviços: ${companyData.produtos_servicos || 'Não informado'}
-Função dos Produtos: ${companyData.funcao_produtos || 'Não informado'}
-Diferenciais: ${companyData.diferenciais || 'Não informado'}
-Concorrentes: ${companyData.concorrentes || 'Não informado'}
-Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados_metricas || 'Não informado'}
-Erros Comuns: ${companyData.erros_comuns || 'Não informado'}
-Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
-    }
-
-    // Buscar playbook da empresa (inclui metodologia pré-extraída se disponível)
-    const { data: playbook } = await supabaseAdmin
-      .from('sales_playbooks')
-      .select('content, methodology, methodology_status')
-      .eq('company_id', companyId)
-      .eq('is_active', true)
-      .single()
-
-    if (playbook?.content) {
-      playbookContent = playbook.content
-      console.log('📖 Playbook encontrado, incluindo na avaliação do roleplay')
-      if (playbook.methodology_status === 'ready' && playbook.methodology) {
-        playbookMethodology = playbook.methodology
-        console.log('📋 Metodologia pré-extraída disponível, usando critérios fixos')
-      }
-    }
-  }
-
-  // 2. Montar prompt do usuário
-  let userPrompt = USER_PROMPT_TEMPLATE
-    .replace('{transcription}', transcription)
-    .replace('{client_profile}', clientProfile)
-    .replace('{objetivo}', objetivo)
-    .replace('{company_data}', companyContext)
-
-  // 3. Se houver metodologia, adicionar avaliação de aderência ao playbook
-  if (playbookMethodology?.dimensions) {
-    const methodologyJson = JSON.stringify(playbookMethodology.dimensions, null, 2)
-    userPrompt += `
-
-=== CARD: PLAYBOOK ADHERENCE ===
+=== TRANSCRIÇÃO ===
+${transcription}
+=== FIM DA TRANSCRIÇÃO ===
 
 CONTEXTO COMPLETO DA EMPRESA:
 - Nome: ${companyName}
@@ -872,12 +816,12 @@ A empresa possui uma METODOLOGIA DE VENDAS PERSONALIZADA extraída dos seus mate
 === METODOLOGIA DA EMPRESA (CRITÉRIOS OBRIGATÓRIOS) ===
 ${methodologyJson}
 === FIM DA METODOLOGIA ===
-${playbookContent ? `
+
 MATERIAIS COMPLETOS DA EMPRESA (playbook + documentos — use para buscar evidências e trechos específicos):
 --- INÍCIO DOS MATERIAIS ---
 ${playbookContent}
 --- FIM DOS MATERIAIS ---
-` : ''}
+
 COMO AVALIAR CADA CRITÉRIO:
 
 Cada critério da metodologia contém:
@@ -970,80 +914,207 @@ REGRAS ESPECIAIS:
    Separe as partes com quebras de linha. Tom de mentor, não de juiz.
 7. TODOS os textos em português
 
-FORMATO DO JSON — inclua o campo "playbook_adherence":
+FORMATO DO JSON:
 {
-  "playbook_adherence": {
-    "overall_adherence_score": 0-100,
-    "adherence_level": "non_compliant|partial|compliant|exemplary",
-    "dimensions": {
-      "opening": {
-        "score": 0-100,
-        "status": "not_evaluated|missed|partial|compliant|exemplary",
-        "criteria_evaluated": [
-          {
-            "criterion": "Nome do critério da metodologia",
-            "type": "required|recommended|prohibited",
-            "weight": "critical|high|medium|low",
-            "result": "compliant|partial|missed|violated|not_applicable",
-            "evidence": "TRECHO LITERAL da transcrição: 'Vendedor: ... / Cliente: ...' (copie exatamente). Se missed: descreva o momento onde deveria ter agido.",
-            "points_earned": 100,
-            "notes": "OBRIGATÓRIO: O que o vendedor fez vs o que deveria ter feito. Referencie a metodologia. Ex: 'O vendedor apresentou o produto sem pedir permissão. A metodologia exige: [trecho do playbook]. Deveria ter dito: [exemplo].'"
-          }
-        ],
-        "dimension_feedback": "Feedback de 2-3 frases com TRECHOS da transcrição explicando o score. Ex: 'O vendedor abriu com [trecho], demonstrando boa energia mas sem seguir o script de abertura que pede [trecho do playbook].'"
-      },
-      "closing": { "..." },
-      "conduct": { "..." },
-      "required_scripts": { "..." },
-      "process": { "..." }
+  "overall_adherence_score": 0-100,
+  "adherence_level": "non_compliant|partial|compliant|exemplary",
+  "dimensions": {
+    "opening": {
+      "score": 0-100,
+      "status": "not_evaluated|missed|partial|compliant|exemplary",
+      "criteria_evaluated": [
+        {
+          "criterion": "Nome do critério da metodologia",
+          "type": "required|recommended|prohibited",
+          "weight": "critical|high|medium|low",
+          "result": "compliant|partial|missed|violated|not_applicable",
+          "evidence": "TRECHO LITERAL da transcrição: 'Vendedor: ... / Cliente: ...' (copie exatamente). Se missed: descreva o momento onde deveria ter agido.",
+          "points_earned": 100,
+          "notes": "OBRIGATÓRIO: O que o vendedor fez vs o que deveria ter feito. Referencie a metodologia. Ex: 'O vendedor apresentou o produto sem pedir permissão. A metodologia exige: [trecho do playbook]. Deveria ter dito: [exemplo].'"
+        }
+      ],
+      "dimension_feedback": "Feedback de 2-3 frases com TRECHOS da transcrição explicando o score. Ex: 'O vendedor abriu com [trecho], demonstrando boa energia mas sem seguir o script de abertura que pede [trecho do playbook].'"
     },
-    "violations": [{ "criterion": "regra violada", "type": "prohibited", "severity": "critical|high|medium|low", "evidence": "TRECHO EXATO da transcrição onde violou", "impact": "impacto concreto da violação", "recommendation": "como corrigir com exemplo de fala" }],
-    "missed_requirements": [{ "criterion": "requisito não cumprido", "type": "required", "weight": "critical|high|medium|low", "expected": "O que a metodologia/playbook diz (cite trecho do material)", "moment": "Momento EXATO da conversa: 'Quando o cliente disse: [trecho]'", "recommendation": "Exemplo concreto do que deveria ter dito: '[fala sugerida]'" }],
-    "exemplary_moments": [{ "criterion": "critério executado de forma exemplar", "evidence": "TRECHO LITERAL da transcrição mostrando o acerto: 'Vendedor: ...'", "why_exemplary": "Por que foi bom comparado ao que a metodologia pede" }],
-    "playbook_summary": { "total_criteria_extracted": 0, "criteria_compliant": 0, "criteria_partial": 0, "criteria_missed": 0, "criteria_violated": 0, "criteria_not_applicable": 0, "critical_criteria_met": "X de Y", "compliance_rate": "XX%" },
-    "coaching_notes": "ESTRUTURADO:\n\nO QUE VOCÊ FEZ BEM:\n- [acerto 1 com trecho da transcrição]\n- [acerto 2]\n\nO QUE MELHORAR:\n- [ponto 1: o que fez → o que a metodologia pede → como deveria falar]\n- [ponto 2]\n\nPRÓXIMO PASSO:\n[ação concreta prioritária]"
-  }
+    "closing": { "..." },
+    "conduct": { "..." },
+    "required_scripts": { "..." },
+    "process": { "..." }
+  },
+  "violations": [{ "criterion": "regra violada", "type": "prohibited", "severity": "critical|high|medium|low", "evidence": "TRECHO EXATO da transcrição onde violou", "impact": "impacto concreto da violação", "recommendation": "como corrigir com exemplo de fala" }],
+  "missed_requirements": [{ "criterion": "requisito não cumprido", "type": "required", "weight": "critical|high|medium|low", "expected": "O que a metodologia/playbook diz (cite trecho do material)", "moment": "Momento EXATO da conversa: 'Quando o cliente disse: [trecho]'", "recommendation": "Exemplo concreto do que deveria ter dito: '[fala sugerida]'" }],
+  "exemplary_moments": [{ "criterion": "critério executado de forma exemplar", "evidence": "TRECHO LITERAL da transcrição mostrando o acerto: 'Vendedor: ...'", "why_exemplary": "Por que foi bom comparado ao que a metodologia pede" }],
+  "playbook_summary": { "total_criteria_extracted": 0, "criteria_compliant": 0, "criteria_partial": 0, "criteria_missed": 0, "criteria_violated": 0, "criteria_not_applicable": 0, "critical_criteria_met": "X de Y", "compliance_rate": "XX%" },
+  "coaching_notes": "ESTRUTURADO:\\n\\nO QUE VOCÊ FEZ BEM:\\n- [acerto 1 com trecho da transcrição]\\n- [acerto 2]\\n\\nO QUE MELHORAR:\\n- [ponto 1: o que fez → o que a metodologia pede → como deveria falar]\\n- [ponto 2]\\n\\nPRÓXIMO PASSO:\\n[ação concreta prioritária]"
 }`
-  }
 
-  console.log('📤 Enviando para OpenAI GPT-4o...')
-
-  // 4. Chamar OpenAI com JSON mode
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1',
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: PLAYBOOK_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt }
     ],
     response_format: { type: 'json_object' },
     temperature: 0.3,
-    max_tokens: 16000 // SPIN + objeções + playbook_adherence requer bastante espaço
+    max_tokens: 16000
   })
 
   const content = response.choices[0].message.content
-
   if (!content) {
-    throw new Error('OpenAI retornou resposta vazia')
+    throw new Error('OpenAI retornou resposta vazia para Playbook')
   }
 
-  console.log('✅ Resposta OpenAI recebida')
+  console.log('✅ Playbook recebido | Tokens:', response.usage?.total_tokens, '| Completion:', response.usage?.completion_tokens)
 
-  // 5. Parse e validar
-  const evaluation = JSON.parse(content) as RoleplayEvaluation
+  return JSON.parse(content) as PlaybookAdherence
+}
 
-  // 6. Converter overall_score de 0-100 para 0-10 (compatibilidade com sistema atual)
+// ===== AVALIAÇÃO PRINCIPAL =====
+
+export async function evaluateRoleplay(params: EvaluationParams): Promise<RoleplayEvaluation> {
+  const { transcription, clientProfile, objetivo, companyId } = params
+
+  console.log('🤖 Iniciando avaliação direta via OpenAI...')
+
+  // 1. Buscar dados da empresa para validação
+  let companyContext = 'Dados da empresa não disponíveis'
+  let playbookContent: string | null = null
+  let playbookMethodology: any = null
+
+  // Variáveis para contexto do playbook
+  let companyName = 'Não informado'
+  let companyDescription = 'Não informado'
+  let companyType = 'Não informado'
+
+  if (companyId) {
+    // Buscar nome da empresa
+    const { data: company } = await supabaseAdmin
+      .from('companies')
+      .select('name')
+      .eq('id', companyId)
+      .single()
+
+    if (company?.name) {
+      companyName = company.name
+    }
+
+    // Buscar tipo da empresa (B2B/B2C)
+    const { data: typeData } = await supabaseAdmin
+      .from('company_type')
+      .select('type')
+      .eq('company_id', companyId)
+      .single()
+
+    if (typeData?.type) {
+      companyType = typeData.type
+    }
+
+    // Buscar dados da empresa
+    const { data: companyData } = await supabaseAdmin
+      .from('company_data')
+      .select('*')
+      .eq('company_id', companyId)
+      .single()
+
+    if (companyData) {
+      companyDescription = companyData.descricao || 'Não informado'
+      companyContext = `Nome: ${companyData.nome || companyName}
+Descrição: ${companyData.descricao || 'Não informado'}
+Produtos/Serviços: ${companyData.produtos_servicos || 'Não informado'}
+Função dos Produtos: ${companyData.funcao_produtos || 'Não informado'}
+Diferenciais: ${companyData.diferenciais || 'Não informado'}
+Concorrentes: ${companyData.concorrentes || 'Não informado'}
+Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados_metricas || 'Não informado'}
+Erros Comuns: ${companyData.erros_comuns || 'Não informado'}
+Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
+    }
+
+    // Buscar playbook da empresa (inclui metodologia pré-extraída se disponível)
+    const { data: playbook } = await supabaseAdmin
+      .from('sales_playbooks')
+      .select('content, methodology, methodology_status')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .single()
+
+    if (playbook?.content) {
+      playbookContent = playbook.content
+      console.log('📖 Playbook encontrado, incluindo na avaliação do roleplay')
+      if (playbook.methodology_status === 'ready' && playbook.methodology) {
+        playbookMethodology = playbook.methodology
+        console.log('📋 Metodologia pré-extraída disponível, usando critérios fixos')
+      }
+    }
+  }
+
+  // 2. Montar prompt SPIN (sem playbook)
+  const spinUserPrompt = USER_PROMPT_TEMPLATE
+    .replace('{transcription}', transcription)
+    .replace('{client_profile}', clientProfile)
+    .replace('{objetivo}', objetivo)
+    .replace('{company_data}', companyContext)
+
+  // 3. Rodar avaliações em PARALELO — cada agente focado 100% na sua tarefa
+  const hasPlaybook = !!(playbookMethodology?.dimensions && playbookContent)
+
+  console.log('📤 Enviando avaliações em paralelo...')
+  console.log(`   🎯 Agente SPIN: avaliação SPIN + objeções`)
+  if (hasPlaybook) {
+    console.log(`   📖 Agente Playbook: aderência ao playbook`)
+  }
+
+  // Agente 1: SPIN + objeções (sempre roda)
+  const spinPromise = openai.chat.completions.create({
+    model: 'gpt-4.1',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: spinUserPrompt }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: 16000
+  })
+
+  // Agente 2: Playbook adherence (só se tiver metodologia)
+  const playbookPromise = hasPlaybook ? evaluatePlaybookAdherence({
+    transcription,
+    companyName,
+    companyDescription,
+    companyType,
+    companyContext,
+    playbookMethodology: playbookMethodology!,
+    playbookContent: playbookContent!,
+  }) : Promise.resolve(null)
+
+  // Aguardar ambos em paralelo
+  const [spinResponse, playbookResult] = await Promise.all([spinPromise, playbookPromise])
+
+  // Parse SPIN
+  const spinContent = spinResponse.choices[0].message.content
+  if (!spinContent) {
+    throw new Error('OpenAI retornou resposta vazia para SPIN')
+  }
+
+  console.log('✅ SPIN recebido | Tokens:', spinResponse.usage?.total_tokens, '| Completion:', spinResponse.usage?.completion_tokens)
+
+  const evaluation = JSON.parse(spinContent) as RoleplayEvaluation
+
+  // Remover playbook_adherence se veio no SPIN por engano
+  delete evaluation.playbook_adherence
+
+  // Converter overall_score de 0-100 para 0-10
   if (evaluation.overall_score > 10) {
     evaluation.overall_score = evaluation.overall_score / 10
   }
 
-  // 7. Se não tinha playbook, garantir que playbook_adherence não exista
-  if (!playbookContent && evaluation.playbook_adherence) {
-    delete evaluation.playbook_adherence
+  // Combinar com resultado do playbook
+  if (playbookResult) {
+    evaluation.playbook_adherence = playbookResult
+    console.log('📖 Playbook Adherence - Score:', playbookResult.overall_adherence_score + '%', '| Level:', playbookResult.adherence_level)
   }
 
-  console.log('✅ Avaliação pronta - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
-  if (evaluation.playbook_adherence) {
-    console.log('📖 Playbook Adherence - Score:', evaluation.playbook_adherence.overall_adherence_score + '%', '| Level:', evaluation.playbook_adherence.adherence_level)
+  console.log('✅ Avaliação completa - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
+  if (evaluation.spin_evaluation) {
+    console.log('🎯 SPIN Scores - S:', evaluation.spin_evaluation.S?.final_score, '| P:', evaluation.spin_evaluation.P?.final_score, '| I:', evaluation.spin_evaluation.I?.final_score, '| N:', evaluation.spin_evaluation.N?.final_score)
   }
 
   return evaluation

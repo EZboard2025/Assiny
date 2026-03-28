@@ -227,7 +227,12 @@
       "Bash(ssh root@31.97.84.130 'PGPASSWORD=\"\"BASEDEDADOSDARAMPPY\"\" psql \"\"postgresql://postgres.vvqtgclprllryctavqal@aws-0-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require\"\" -c \"\"ALTER TABLE sales_playbooks ADD COLUMN IF NOT EXISTS methodology JSONB DEFAULT NULL; ALTER TABLE sales_playbooks ADD COLUMN IF NOT EXISTS methodology_status TEXT DEFAULT NULL;\"\"')",
       "Bash(ssh root@31.97.84.130 'PGPASSWORD=\"\"BASEDEDADOSDARAMPPY\"\" psql \"\"postgresql://postgres:BASEDEDADOSDARAMPPY@db.vvqtgclprllryctavqal.supabase.co:5432/postgres?sslmode=require\"\" -c \"\"ALTER TABLE sales_playbooks ADD COLUMN IF NOT EXISTS methodology JSONB DEFAULT NULL; ALTER TABLE sales_playbooks ADD COLUMN IF NOT EXISTS methodology_status TEXT DEFAULT NULL;\"\"')",
       "Bash(ssh root@31.97.84.130 'PGPASSWORD=\"\"BASEDEDADOSDARAMPPY\"\" psql \"\"postgresql://postgres:BASEDEDADOSDARAMPPY@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require\"\" -c \"\"SELECT 1;\"\"')",
-      "Bash(ssh root@31.97.84.130 'PGPASSWORD=\"\"BASEDEDADOSDARAMPPY\"\" psql \"\"postgresql://postgres.vvqtgclprllryctavqal:BASEDEDADOSDARAMPPY@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require\"\" -c \"\"SELECT 1;\"\"')"
+      "Bash(ssh root@31.97.84.130 'PGPASSWORD=\"\"BASEDEDADOSDARAMPPY\"\" psql \"\"postgresql://postgres.vvqtgclprllryctavqal:BASEDEDADOSDARAMPPY@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require\"\" -c \"\"SELECT 1;\"\"')",
+      "Bash(grep -A 30 \"CREATE TABLE.*roleplay_sessions\" supabase/migrations/*.sql)",
+      "Bash(grep -l \"evaluation\" supabase/migrations/*.sql)",
+      "Bash(grep -r \"ADD COLUMN.*evaluation\" supabase/migrations/*.sql)",
+      "Bash(grep -r \"CREATE TABLE.*roleplay_sessions\" supabase/migrations/*.sql)",
+      "Bash(grep -r \"roleplay_sessions\" supabase/migrations/*.sql)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
