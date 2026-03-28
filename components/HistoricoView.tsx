@@ -39,6 +39,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+  const [expandedPlaybookDim, setExpandedPlaybookDim] = useState<string | null>(null)
   const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | 'gravacoes' | null>(
     (initialHistoryTab as any) || (urlTab === 'meet' ? 'meet' : null)
   )
@@ -515,7 +516,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
                     return (
                       <button
                         key={session.id}
-                        onClick={() => { setSelectedSession(session); setExpandedSection(null) }}
+                        onClick={() => { setSelectedSession(session); setExpandedSection(null); setExpandedPlaybookDim(null) }}
                         className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
                           selectedSession?.id === session.id
                             ? 'bg-green-50 border-l-4 border-l-green-500'
@@ -1057,11 +1058,11 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
                                       ].map(({ key, label, icon }) => {
                                         const dim = pa.dimensions?.[key as keyof typeof pa.dimensions] as any
                                         if (!dim || dim.status === 'not_evaluated') return null
-                                        const isExpanded = expandedSection === `pb_dim_${key}`
+                                        const isExpanded = expandedPlaybookDim === key
                                         return (
                                           <div key={key} className="border border-gray-200 rounded-xl overflow-hidden">
                                             <button
-                                              onClick={() => setExpandedSection(isExpanded ? 'playbook' : `pb_dim_${key}`)}
+                                              onClick={() => setExpandedPlaybookDim(isExpanded ? null : key)}
                                               className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
                                             >
                                               <div className="flex items-center gap-3">

@@ -1233,31 +1233,8 @@ function ConfigurationInterface({
           setPlaybookTitle(saveResult.playbook.title)
           showToast('success', 'Sucesso', `Playbook "${file.name}" salvo com sucesso!`)
 
-          // Trigger methodology generation (non-blocking)
-          if (saveResult.playbook?.id && userCompanyId) {
-            setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
-            fetch('/api/playbook/generate-methodology', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                playbookId: saveResult.playbook.id,
-                companyId: userCompanyId,
-              })
-            })
-              .then(res => res.json())
-              .then(result => {
-                if (result.success) {
-                  setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
-                  showToast('success', 'Metodologia Gerada', 'A metodologia personalizada foi extraída do playbook.')
-                } else {
-                  setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-                  showToast('warning', 'Atenção', 'Não foi possível gerar a metodologia automaticamente.')
-                }
-              })
-              .catch(() => {
-                setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-              })
-          }
+          // Não gera metodologia automaticamente — o gestor pode querer subir mais arquivos antes
+          // A geração é feita manualmente pelo botão "Gerar Metodologia" no card
         } else {
           showToast('error', 'Erro', saveResult.error || 'Não foi possível salvar o playbook. Tente novamente.')
         }
@@ -1410,30 +1387,7 @@ function ConfigurationInterface({
       showToast('success', 'Dados Salvos', 'Embeddings estão sendo gerados em segundo plano.')
       setCompanyDataEdited(false) // Resetar flag de edição após salvar
 
-      // Regenerate methodology if playbook exists (company data affects methodology context)
-      if (playbook?.id && companyId) {
-        setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
-        fetch('/api/playbook/generate-methodology', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            playbookId: playbook.id,
-            companyId,
-          })
-        })
-          .then(res => res.json())
-          .then(result => {
-            if (result.success) {
-              setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
-              showToast('success', 'Metodologia Atualizada', 'A metodologia foi regenerada com os novos dados da empresa.')
-            } else {
-              setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-            }
-          })
-          .catch(() => {
-            setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-          })
-      }
+      // Não regenera metodologia automaticamente — gestor usa botão "Regenerar" manualmente
 
       // No modo onboarding, fechar ConfigHub após salvar para voltar à tela de cards
       if (onboardingMode && onClose) {
@@ -1601,27 +1555,7 @@ function ConfigurationInterface({
         showToast('warning', 'Arquivos Duplicados', `${skipped} arquivo(s) já enviado(s) anteriormente`)
       }
 
-      // Regenerate methodology if new files were uploaded and playbook exists
-      if (uploaded > 0 && playbook?.id && userCompanyId) {
-        setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
-        fetch('/api/playbook/generate-methodology', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playbookId: playbook.id, companyId: userCompanyId })
-        })
-          .then(res => res.json())
-          .then(result => {
-            if (result.success) {
-              setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
-              showToast('success', 'Metodologia Atualizada', 'Novos documentos incorporados à metodologia.')
-            } else {
-              setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-            }
-          })
-          .catch(() => {
-            setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-          })
-      }
+      // Não gera metodologia automaticamente — gestor usa botão "Gerar/Regenerar" manualmente
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
@@ -1660,27 +1594,6 @@ function ConfigurationInterface({
       // Remover da lista
       setSavedPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
       showToast('success', 'PDF Removido', 'Arquivo deletado com sucesso')
-
-      // Regenerate methodology if playbook exists (material changed)
-      if (playbook?.id && userCompanyId) {
-        setPlaybook(prev => prev ? { ...prev, methodology_status: 'generating' } : null)
-        fetch('/api/playbook/generate-methodology', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playbookId: playbook.id, companyId: userCompanyId })
-        })
-          .then(res => res.json())
-          .then(result => {
-            if (result.success) {
-              setPlaybook(prev => prev ? { ...prev, methodology: result.methodology, methodology_status: 'ready' } : null)
-            } else {
-              setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-            }
-          })
-          .catch(() => {
-            setPlaybook(prev => prev ? { ...prev, methodology_status: 'error' } : null)
-          })
-      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'

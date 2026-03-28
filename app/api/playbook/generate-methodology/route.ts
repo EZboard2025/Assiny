@@ -20,7 +20,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   return result.text || ''
 }
 
-const EXTRACTION_PROMPT = `Você é um consultor sênior especializado em criar metodologias de avaliação de vendas personalizadas para empresas. Sua tarefa é analisar TODOS os materiais de vendas desta empresa e construir uma METODOLOGIA DE AVALIAÇÃO PROFUNDA E ESPECÍFICA — não genérica.
+const EXTRACTION_PROMPT = `Você é um analista que lê materiais de vendas de empresas e extrai FIELMENTE todas as regras, scripts e processos contidos neles. Sua função NÃO é criar critérios — é COPIAR o que o material diz.
 
 === DADOS DA EMPRESA ===
 {company_context}
@@ -28,120 +28,121 @@ const EXTRACTION_PROMPT = `Você é um consultor sênior especializado em criar 
 === MATERIAIS DE VENDAS DA EMPRESA ===
 {all_materials}
 
-=== INSTRUÇÕES DETALHADAS ===
+=== COMO TRABALHAR ===
 
-LEIA TODO O MATERIAL antes de começar. Depois, construa a metodologia seguindo estas etapas:
+PASSO 1 — LEITURA COMPLETA
+Leia TODO o material do início ao fim. Não pule nada.
 
-ETAPA 1 — COMPREENDER A FILOSOFIA DE VENDAS
-Antes de extrair critérios, entenda:
-- Qual é a abordagem de vendas da empresa? (consultiva, transacional, challenger, solution selling, etc.)
-- Qual é o ciclo de vendas típico? (dias, semanas, meses)
-- Quem é o público-alvo? (personas, segmentos, tamanho de empresa)
-- Quais são os valores fundamentais na condução de vendas?
+PASSO 2 — EXTRAIR TUDO (sem organizar ainda)
+Percorra o material parágrafo por parágrafo e extraia TODAS as regras que encontrar:
+- Cada frase imperativa ("O vendedor deve...", "Sempre faça...", "É obrigatório...")
+- Cada proibição ("Nunca...", "Não pode...", "Evite...", "É proibido...")
+- Cada script literal ou frase modelo (copie EXATAMENTE como está)
+- Cada etapa de processo descrita
+- Cada pergunta que o vendedor deve fazer
+- Cada recomendação ou boa prática
 
-ETAPA 2 — EXTRAIR CRITÉRIOS EM 3 NÍVEIS DE PROFUNDIDADE
+PASSO 3 — ORGANIZAR NAS 5 DIMENSÕES
+Distribua as regras extraídas nas dimensões abaixo. Se uma regra não encaixa em nenhuma, coloque em "conduct" (conduta geral).
 
-Para CADA critério, extraia em 3 níveis:
-1. ESTRATÉGICO: Qual é o princípio ou abordagem por trás?
-2. TÁTICO: Quais técnicas específicas o vendedor deve usar?
-3. OPERACIONAL: Quais scripts literais, frases exatas, ou ações concretas são esperadas?
+Dimensões:
+- opening: Tudo sobre o INÍCIO da conversa (primeiros minutos, apresentação, saudação, gancho, permissão)
+- closing: Tudo sobre o FIM/AVANÇO da conversa (próximos passos, agendamento, compromisso, recapitulação)
+- conduct: Regras de COMPORTAMENTO durante toda a conversa (tom, proibições, escuta, atitude, linguagem)
+- required_scripts: FRASES LITERAIS, perguntas padronizadas, pitchs definidos, respostas-modelo
+- process: ETAPAS do funil, qualificação, sequência de ações, critérios de avanço
 
-ETAPA 3 — CRUZAR COM DADOS DA EMPRESA
-Use os dados da empresa para gerar critérios sobre:
-- Mencionar CORRETAMENTE os diferenciais específicos (quais são, como posicionar)
-- Citar métricas, cases e provas sociais REAIS (não inventar)
-- Abordar as dores que a empresa resolve (linguagem específica)
-- Evitar os erros comuns listados pela empresa
-- Posicionar corretamente contra concorrentes mencionados
+PASSO 4 — VERIFICAR COMPLETUDE
+Releia o material inteiro novamente e confira: alguma regra, script ou processo ficou de fora? Se sim, adicione.
 
-ETAPA 4 — ORGANIZAR NAS 5 DIMENSÕES
+=== COMO ESCREVER CADA CRITÉRIO ===
 
-1. ABERTURA (opening)
-- Script de abertura completo (frase por frase se o material definir)
-- Gancho personalizado conforme perfil do prospect
-- Pedido de tempo/permissão
-- Posicionamento inicial (como a empresa se apresenta)
-- Primeiros 30-60 segundos
+REGRA PRINCIPAL: COPIE, NÃO RESUMA.
 
-2. FECHAMENTO (closing)
-- Técnicas de fechamento específicas do material
-- Próximo passo concreto (qual exatamente? reunião? demo? proposta?)
-- Como recapitular acordos
-- Como criar compromisso do prospect
-- Frases de transição para o fechamento
+Exemplos de critério RUIM (genérico, resumido — NÃO FAÇA ISSO):
+❌ "Usar tom adequado na abertura"
+❌ "Apresentar os benefícios do produto"
+❌ "Fazer perguntas de qualificação"
+❌ "Demonstrar empatia com o prospect"
+❌ "Seguir o processo de vendas"
 
-3. CONDUTA (conduct)
-- Regras de comportamento ESPECÍFICAS (não "seja educado", mas "nunca interrompa o prospect quando ele está descrevendo uma dor")
-- Proibições EXPLÍCITAS do material (frases proibidas, comportamentos vetados)
-- Tom de comunicação (formal? informal? consultivo?)
-- Regras de escuta ativa específicas
-- Como lidar com situações de conflito ou objeção emocional
+Exemplos de critério BOM (específico, fiel ao material — FAÇA ASSIM):
+✅ "Iniciar a ligação com: 'Oi [nome], aqui é o [seu nome] da [empresa], tudo bem? Vi que você [referência personalizada]'"
+✅ "Mencionar os 3 benefícios-chave conforme o playbook: redução de 40% no tempo de onboarding, aumento de 25% na taxa de conversão, e dashboard em tempo real"
+✅ "Perguntar as 5 perguntas BANT+: Budget, Authority, Need, Timeline, Pain — nessa ordem"
+✅ "Nunca dizer 'nosso produto é o mais barato' — posicionar como investimento, não custo"
+✅ "Após a discovery, fazer recap usando a frase: 'Então resumindo o que entendi, [nome]...'"
 
-4. SCRIPTS OBRIGATÓRIOS (required_scripts)
-- Frases LITERAIS que o material exige (copie exatamente como aparecem)
-- Perguntas de qualificação padronizadas
-- Respostas-padrão para objeções comuns
-- Pitch de produto/serviço como definido no material
-- Frases de transição entre etapas
+Para CADA critério extraído:
 
-5. PROCESSO (process)
-- Etapas do funil de vendas passo a passo (se definido)
-- Critérios de qualificação (BANT, MEDDIC, ou o que o material usar)
-- O que documentar/registrar após cada interação
-- Quando/como fazer handoff para outras áreas
-- Métricas ou KPIs esperados
+"criterion": Título curto mas ESPECÍFICO — inclua nomes, números ou frases-chave do material. Não generalize.
 
-=== REGRAS DE CLASSIFICAÇÃO ===
+"detailed_description": Copie e expanda o que o material diz. Use formato: "Conforme o material: '[trecho literal]'. Na prática, o vendedor deve [explicação de como aplicar]." Inclua frases exatas quando existirem.
+
+"evaluation_guidance": Descreva o que um avaliador deve PROCURAR NA TRANSCRIÇÃO para verificar se o vendedor cumpriu. Seja específico: "Procure no início da conversa se o vendedor disse '[frase X]' ou variação próxima. Se disse algo similar mas não exatamente, é 'partial'. Se pulou direto para o pitch sem saudação, é 'missed'."
+
+"source_excerpt": Trecho LITERAL do material, copiado exatamente como está (até 500 caracteres). NÃO resuma — copie.
+
+=== CLASSIFICAÇÃO ===
 
 "type":
-- "required": O material usa linguagem imperativa ("deve", "sempre", "obrigatório", "é necessário", "tem que")
-- "recommended": Linguagem sugestiva ("recomendado", "ideal", "prefira", "tente", "quando possível")
-- "prohibited": Linguagem negativa ("nunca", "não", "evitar", "proibido", "jamais", "não é permitido")
+- "required": Material usa linguagem imperativa ("deve", "sempre", "obrigatório", "tem que")
+- "recommended": Linguagem sugestiva ("recomendado", "ideal", "prefira", "quando possível")
+- "prohibited": Linguagem proibitiva ("nunca", "não", "evitar", "proibido", "jamais")
 
 "weight":
-- "critical": Marcado como crítico/essencial, ou pode causar perda de deal/cliente. Regras de compliance, proibições graves.
-- "high": Enfatizado no material, tem seção dedicada, ou é repetido múltiplas vezes.
-- "medium": Mencionado como boa prática, aparece no contexto de recomendações.
-- "low": Sugestão, nice-to-have, mencionado de passagem.
+- "critical": Marcado como essencial, repetido múltiplas vezes, ou pode causar perda de deal
+- "high": Tem seção dedicada no material ou é enfatizado
+- "medium": Mencionado como boa prática
+- "low": Sugestão ou menção de passagem
 
-=== REGRAS FUNDAMENTAIS ===
+=== FILTRO CRÍTICO: SÓ INCLUA O QUE UMA IA PODE AVALIAR LENDO TEXTO ===
 
-1. NÃO INVENTE critérios genéricos. Se o material não menciona, a dimensão fica com status "not_found".
-2. SEM LIMITE de critérios por dimensão — extraia TODOS que forem relevantes. Pode ter 3 ou 25.
-3. SCRIPTS LITERAIS: Se o material contém frases exatas, copie-as no campo source_excerpt e referencie no criterion.
-4. NOMES PRÓPRIOS: Se o material menciona produtos, serviços, métricas, cases ou concorrentes por nome, inclua nos critérios.
-5. CONTEXTO ESPECÍFICO: "Mencionar que a empresa tem 500+ clientes ativos" é melhor que "Usar prova social".
-6. PROIBIÇÕES ESPECÍFICAS: "Nunca dizer 'é barato'" é melhor que "Evitar linguagem negativa sobre preço".
-7. source_excerpt deve ser um trecho LITERAL e extenso do material (até 300 caracteres), não um resumo.
-8. APENAS CRITÉRIOS VERIFICÁVEIS NA CONVERSA: Esta metodologia será usada para avaliar TRANSCRIÇÕES de vendas (simulações ou reuniões reais). Só inclua critérios que podem ser verificados OUVINDO ou LENDO a conversa. EXCLUA critérios sobre:
-   - Ações fora da conversa (ex: "pesquisar no CRM antes de ligar", "preencher relatório após a call", "enviar e-mail de follow-up")
-   - Preparação prévia que não é visível na conversa (ex: "estudar o LinkedIn do prospect", "ler o site da empresa")
-   - Métricas operacionais (ex: "fazer X ligações por dia", "manter taxa de conversão de Y%")
-   - Processos internos de documentação (ex: "atualizar o pipeline", "registrar no sistema")
-   Se o material menciona esses critérios, IGNORE-OS — eles não podem ser avaliados numa transcrição.
-   PORÉM: Se o critério é sobre DEMONSTRAR que fez pesquisa prévia (ex: "mencionar algo específico do prospect que mostre que pesquisou"), aí SIM é verificável na conversa e deve ser incluído.
+ATENÇÃO: Esta metodologia será usada por uma IA que avalia TRANSCRIÇÕES DE TEXTO de conversas de vendas. A IA só tem acesso ao TEXTO da conversa — ela NÃO pode ver, ouvir ou perceber nada além das palavras escritas/faladas.
 
-=== FORMATO JSON DE RESPOSTA ===
+EXCLUA OBRIGATORIAMENTE critérios sobre:
+- Ações fora da conversa (pesquisar CRM, enviar email, preencher relatório, agendar follow-up no sistema)
+- Preparação não visível na conversa (estudar LinkedIn, ler site, pesquisar empresa)
+- Métricas operacionais (X ligações por dia, taxa de conversão, tempo de resposta)
+- LINGUAGEM CORPORAL ou sinais não-verbais (tom de voz, postura, expressão facial, contato visual, gestos)
+- SINAIS DE COMPRA NÃO-VERBAIS (linguagem corporal do prospect, expressões, hesitações não-verbais)
+- Qualquer coisa que exija OUVIR áudio (entonação, ritmo da fala, pausas dramáticas, volume da voz)
+- Qualquer coisa que exija VER vídeo (compartilhamento de tela, apresentação visual, reação facial)
+- Sentimentos ou intenções internas do vendedor ou prospect que não são expressos em palavras
 
-Retorne APENAS JSON válido (sem markdown, sem comentários):
+TESTE PARA CADA CRITÉRIO: "Uma IA lendo APENAS o texto transcrito consegue verificar se isso foi feito?" Se a resposta for NÃO, EXCLUA o critério.
+
+PORÉM INCLUA: Se o critério é sobre algo que APARECE NO TEXTO da conversa (ex: "mencionar dado específico do prospect", "fazer pergunta X", "usar frase Y"), inclua.
+
+=== REGRAS FINAIS ===
+
+1. NÃO INVENTE. Se o material não menciona, não crie. Dimensão vazia = status "not_found".
+2. SEM LIMITE de critérios. Extraia TODOS. Pode ter 3 ou 30.
+3. COPIE frases literais do material — não parafraseie.
+4. NOMES PRÓPRIOS: Se o material cita produtos, métricas, cases ou concorrentes por nome, mantenha.
+5. Ao terminar, RELEIA o material e verifique se TUDO foi capturado.
+
+=== FORMATO JSON ===
+
+Retorne APENAS JSON válido (sem markdown):
 
 {
-  "sales_philosophy": "Descrição de 3-5 frases da filosofia de vendas da empresa, baseada nos materiais",
-  "target_audience": "Descrição do público-alvo principal conforme os materiais",
+  "sales_philosophy": "3-5 frases descrevendo a filosofia de vendas da empresa CONFORME OS MATERIAIS (não invente)",
+  "target_audience": "Público-alvo conforme descrito nos materiais",
   "dimensions": {
     "opening": {
       "status": "active",
       "criteria": [
         {
-          "criterion": "Título curto e específico do critério",
-          "detailed_description": "Descrição completa de 2-4 frases explicando EXATAMENTE o que é esperado, com exemplos específicos da empresa. Inclua o contexto de quando e como aplicar.",
+          "criterion": "Título específico com frases-chave do material",
+          "detailed_description": "Conforme o material: '[trecho literal]'. O vendedor deve [como aplicar na prática].",
           "type": "required",
           "weight": "critical",
-          "evaluation_guidance": "Como verificar na prática: descreva o que o avaliador deve procurar na transcrição para confirmar que este critério foi cumprido ou não. Seja específico.",
-          "source_excerpt": "Trecho LITERAL do material que fundamenta este critério (copie exatamente, até 300 chars)"
+          "evaluation_guidance": "Procure na transcrição: [o que o avaliador deve buscar especificamente]. Se encontrar [X] = compliant. Se encontrar [Y parcial] = partial. Se não encontrar = missed.",
+          "source_excerpt": "Trecho LITERAL do material copiado exatamente (até 500 chars)"
         }
       ],
-      "dimension_summary": "Resumo de 2-3 frases do que o material espera nesta dimensão, incluindo o tom e a abordagem específica"
+      "dimension_summary": "O que o material espera nesta dimensão — cite trechos"
     },
     "closing": { "status": "active|not_found", "criteria": [...], "dimension_summary": "..." },
     "conduct": { "status": "active|not_found", "criteria": [...], "dimension_summary": "..." },
